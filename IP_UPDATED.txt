@@ -1,0 +1,14 @@
+✅ FIXED! IP Updated to 192.168.100.40
+
+Backend server is now running at: http://192.168.100.40:5000
+
+Next Steps:
+1. Stop Expo (Press Ctrl+C in Expo terminal)
+2. Restart Expo with cleared cache:
+
+   cd D:\Nursify\App
+   npm start -- --clear
+
+3. Scan QR code with Expo Go
+
+The app should now connect successfully! 🎉
