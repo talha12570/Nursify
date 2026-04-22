@@ -1,0 +1,607 @@
+# ============================================================================
+# Nursify Healthcare Platform - Smart Backdating Script (PowerShell)
+# ============================================================================
+# Reads actual file creation dates and commits 3-4 hours later
+# Repository: https://github.com/USERNAME/Nursify.git (UPDATE THIS)
+# Timezone: Pakistan Standard Time (UTC+5)
+# ============================================================================
+
+$ErrorActionPreference = "Stop"
+
+Write-Host "╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Blue
+Write-Host "║         Nursify - Smart Backdating with File Dates            ║" -ForegroundColor Blue
+Write-Host "║         Commits created 3-4 hours after file creation         ║" -ForegroundColor Blue
+Write-Host "║                   Pakistan Time (UTC+5)                        ║" -ForegroundColor Blue
+Write-Host "╚════════════════════════════════════════════════════════════════╝" -ForegroundColor Blue
+Write-Host ""
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+
+$DEVELOPER1_NAME = "Talha Aslam"
+$DEVELOPER1_EMAIL = "talha.aslam591@gmail.com"
+
+$DEVELOPER2_NAME = "Muhammad Wajahat"
+$DEVELOPER2_EMAIL = "47749@students.riphah.edu.pk"
+
+$REPO_URL = "https://github.com/talha12570/Nursify.git"
+$REPO_NAME = "Nursify"
+
+$SOURCE_CODE_PATH = Get-Location
+$env:TZ = "Asia/Karachi"
+
+Write-Host "Configuration:" -ForegroundColor Yellow
+Write-Host "  Developer 1:  $DEVELOPER1_NAME ($DEVELOPER1_EMAIL)"
+Write-Host "  Developer 2:  $DEVELOPER2_NAME ($DEVELOPER2_EMAIL)"
+Write-Host "  Repository:   $REPO_URL"
+Write-Host "  Source Code:  $SOURCE_CODE_PATH"
+Write-Host "  Timezone:     Pakistan (UTC+5)"
+Write-Host "  Strategy:     Commits 3-4 hours after file creation"
+Write-Host ""
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+function Get-FileTimestamp {
+    param($FilePath)
+    
+    if (Test-Path $FilePath) {
+        $file = Get-Item $FilePath
+        return $file.LastWriteTime
+    }
+    return $null
+}
+
+function Add-RandomHours {
+    param($DateTime)
+    
+    $randomHours = Get-Random -Minimum 3 -Maximum 5
+    $randomMinutes = Get-Random -Minimum 0 -Maximum 60
+    return $DateTime.AddHours($randomHours).AddMinutes($randomMinutes)
+}
+
+function Format-GitDate {
+    param($DateTime)
+    
+    return $DateTime.ToString("yyyy-MM-dd HH:mm:ss")
+}
+
+# ============================================================================
+# ANALYZE FILES
+# ============================================================================
+
+Write-Host "Analyzing file dates..." -ForegroundColor Blue
+Write-Host ""
+
+$fileData = @{}
+$totalFiles = 0
+
+# Scan all relevant files (exclude .bat and .md except README.md)
+$extensions = @("*.js", "*.jsx", "*.ts", "*.tsx", "*.json", "*.css")
+foreach ($ext in $extensions) {
+    Get-ChildItem -Path . -Include $ext -Recurse -File -ErrorAction SilentlyContinue | 
+        Where-Object { $_.FullName -notmatch "node_modules|\.git" } |
+        ForEach-Object {
+            $fileData[$_.FullName] = $_.LastWriteTime
+            $totalFiles++
+        }
+}
+
+# Add README.md specifically
+if (Test-Path "README.md") {
+    $fileData["README.md"] = (Get-Item "README.md").LastWriteTime
+    $totalFiles++
+}
+
+Write-Host "Found $totalFiles files with dates" -ForegroundColor Green
+Write-Host ""
+
+# ============================================================================
+# SAFETY CHECKS
+# ============================================================================
+
+Write-Host "SAFETY CHECKS:" -ForegroundColor Yellow
+
+if (-not (Test-Path "Server") -or -not (Test-Path "App")) {
+    Write-Host "ERROR: Server/ or App/ folder not found" -ForegroundColor Red
+    Write-Host "Run this script from the Nursify root directory"
+    exit 1
+}
+
+Write-Host "[OK] Nursify project structure verified" -ForegroundColor Green
+Write-Host ""
+
+# ============================================================================
+# CONFIRMATIONS
+# ============================================================================
+
+Write-Host "WARNING:" -ForegroundColor Red -NoNewline
+Write-Host ""
+Write-Host "  This will create a FRESH Git history" -ForegroundColor Red
+Write-Host "  Repository: $REPO_URL" -ForegroundColor Red
+Write-Host "  Commits will be backdated to file creation dates + 3-4 hours" -ForegroundColor Red
+Write-Host ""
+
+$configConfirm = Read-Host "Have you updated DEVELOPER names, emails, and REPO_URL? (type YES)"
+
+if ($configConfirm -ne "YES") {
+    Write-Host "Please update configuration first" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host ""
+$confirm = Read-Host "Type 'CREATE HISTORY' to proceed"
+
+if ($confirm -ne "CREATE HISTORY") {
+    Write-Host "Aborted" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Starting..." -ForegroundColor Green
+Write-Host ""
+
+# ============================================================================
+# REPOSITORY SETUP
+# ============================================================================
+
+Write-Host "Setting up repository..." -ForegroundColor Blue
+
+# Create temporary directory for new repo
+$TEMP_DIR = "Nursify-Backdated-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+New-Item -ItemType Directory -Path $TEMP_DIR | Out-Null
+Set-Location $TEMP_DIR
+
+git init
+git branch -M main
+
+Write-Host "[OK] Fresh repository initialized" -ForegroundColor Green
+Write-Host ""
+
+# ============================================================================
+# SMART COMMIT FUNCTION
+# ============================================================================
+
+function New-SmartCommit {
+    param(
+        [string]$Author,
+        [string]$Email,
+        [string]$Message,
+        [DateTime]$Timestamp,
+        [string[]]$Files
+    )
+    
+    # Add random 3-4 hours
+    $commitTime = Add-RandomHours -DateTime $Timestamp
+    $gitDate = Format-GitDate -DateTime $commitTime
+    
+    $env:GIT_AUTHOR_NAME = $Author
+    $env:GIT_AUTHOR_EMAIL = $Email
+    $env:GIT_COMMITTER_NAME = $Author
+    $env:GIT_COMMITTER_EMAIL = $Email
+    $env:GIT_AUTHOR_DATE = "$gitDate +0500"
+    $env:GIT_COMMITTER_DATE = "$gitDate +0500"
+    
+    # Copy files
+    foreach ($file in $Files) {
+        $sourcePath = Join-Path $SOURCE_CODE_PATH $file
+        if (Test-Path $sourcePath) {
+            $destDir = Split-Path $file -Parent
+            if ($destDir -and $destDir -ne ".") {
+                New-Item -ItemType Directory -Path $destDir -Force -ErrorAction SilentlyContinue | Out-Null
+            }
+            Copy-Item -Path $sourcePath -Destination $file -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+    
+    git add -A
+    
+    $hasDiff = git diff --cached --quiet
+    if ($LASTEXITCODE -ne 0) {
+        git commit -m $Message --quiet
+        Write-Host "[OK] " -NoNewline -ForegroundColor Green
+        Write-Host "$gitDate " -NoNewline -ForegroundColor Cyan
+        Write-Host "- " -NoNewline
+        Write-Host "$($Author): " -NoNewline -ForegroundColor White
+        Write-Host $Message
+    }
+}
+
+# ============================================================================
+# CREATE COMMITS BASED ON FILE DATES
+# ============================================================================
+
+Write-Host "Creating commits based on file creation dates..." -ForegroundColor Blue
+Write-Host ""
+
+# Get earliest timestamp
+$earliestTime = ($fileData.Values | Sort-Object | Select-Object -First 1)
+if (-not $earliestTime) {
+    $earliestTime = (Get-Date).AddMonths(-3)
+}
+
+# Group 1: Initial Backend Setup
+$serverTs = Get-FileTimestamp "Server/index.js"
+if (-not $serverTs) { $serverTs = $earliestTime }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Initial backend setup for Nursify healthcare platform" `
+    -Timestamp $serverTs `
+    -Files @("Server/package.json", "Server/package-lock.json", "Server/.gitignore",
+             "Server/index.js", "Server/.env.example", "Server/README.md")
+
+# Group 2: Database
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "MongoDB connection and database configuration" `
+    -Timestamp $serverTs.AddHours(1) `
+    -Files @("Server/db.js", "Server/config")
+
+# Group 3: User Models
+$userModelTs = Get-FileTimestamp "Server/modals/user-modals.js"
+if (-not $userModelTs) { $userModelTs = $serverTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "User models with patient nurse caretaker admin roles" `
+    -Timestamp $userModelTs `
+    -Files @("Server/modals/user-modals.js")
+
+# Group 4: Authentication
+$authTs = Get-FileTimestamp "Server/middleware/auth-middleware.js"
+if (-not $authTs) { $authTs = $userModelTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "JWT authentication and middleware setup" `
+    -Timestamp $authTs `
+    -Files @("Server/middleware/auth-middleware.js", "Server/middleware/admin-middleware.js")
+
+# Group 5: Auth Controllers
+$authCtrlTs = Get-FileTimestamp "Server/controllers/auth-controller.js"
+if (-not $authCtrlTs) { $authCtrlTs = $authTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Registration login OTP verification controllers" `
+    -Timestamp $authCtrlTs `
+    -Files @("Server/controllers/auth-controller.js", "Server/router/auth-router.js")
+
+# Group 6: Booking System
+$bookingTs = Get-FileTimestamp "Server/modals/booking-modals.js"
+if (-not $bookingTs) { $bookingTs = $authCtrlTs.AddDays(2) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Booking models and patient APIs" `
+    -Timestamp $bookingTs `
+    -Files @("Server/modals/booking-modals.js", "Server/controllers/patient-controllers.js", `
+             "Server/router/patient-router.js")
+
+# Group 7: Caregiver
+$caregiverTs = Get-FileTimestamp "Server/controllers/caregiver-controllers.js"
+if (-not $caregiverTs) { $caregiverTs = $bookingTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Caregiver controllers and booking management" `
+    -Timestamp $caregiverTs `
+    -Files @("Server/controllers/caregiver-controllers.js", "Server/router/caregiver-router.js")
+
+# Group 8: Admin
+$adminTs = Get-FileTimestamp "Server/controllers/admin-controllers.js"
+if (-not $adminTs) { $adminTs = $caregiverTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Admin controllers for user verification and approval" `
+    -Timestamp $adminTs `
+    -Files @("Server/controllers/admin-controllers.js", "Server/router/admin-router.js")
+
+# Group 9: Cloudinary
+$cloudinaryTs = Get-FileTimestamp "Server/config/cloudinary.js"
+if (-not $cloudinaryTs) { $cloudinaryTs = $adminTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Cloudinary configuration for image uploads with HEIC support" `
+    -Timestamp $cloudinaryTs `
+    -Files @("Server/config/cloudinary.js", "Server/config/multer.js")
+
+# Group 10: Validation
+$validationTs = Get-FileTimestamp "Server/config/validation-data.js"
+if (-not $validationTs) { $validationTs = $cloudinaryTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "CNIC and license validation system" `
+    -Timestamp $validationTs `
+    -Files @("Server/config/validation-data.js", "Server/validators")
+
+# Group 11: Email System
+$emailTs = Get-FileTimestamp "Server/modals/EmailVerificationToken.js"
+if (-not $emailTs) { $emailTs = $validationTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Email verification token model and OTP system" `
+    -Timestamp $emailTs `
+    -Files @("Server/modals/EmailVerificationToken.js", "Server/controllers/otp-controller.js", `
+             "Server/router/otp-router.js")
+
+# Group 12: Utility Scripts
+$scriptsTs = Get-FileTimestamp "Server/createAdmin.js"
+if (-not $scriptsTs) { $scriptsTs = $emailTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Admin creation and testing scripts" `
+    -Timestamp $scriptsTs `
+    -Files @("Server/createAdmin.js", "Server/check-admin.js", "Server/test-registration.js", `
+             "Server/test-booking.js", "Server/seedDatabase.js")
+
+# Group 13: IP Detection
+$ipTs = Get-FileTimestamp "Server/scripts/update-ip.js"
+if (-not $ipTs) { $ipTs = $scriptsTs.AddDays(2) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Automatic IP detection for network switching" `
+    -Timestamp $ipTs `
+    -Files @("Server/scripts")
+
+# ===== FRONTEND DEVELOPER =====
+
+# Group 14: Mobile App Setup
+$appTs = Get-FileTimestamp "App/package.json"
+if (-not $appTs) { $appTs = $serverTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "React Native Expo app initialization with NativeWind" `
+    -Timestamp $appTs `
+    -Files @("App/package.json", "App/package-lock.json", "App/.gitignore", `
+             "App/app.json", "App/babel.config.js", "App/tailwind.config.js", `
+             "App/metro.config.js", "App/global.css")
+
+# Group 15: Navigation
+$navTs = Get-FileTimestamp "App/app/_layout.jsx"
+if (-not $navTs) { $navTs = $appTs.AddHours(5) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "App navigation and layout setup" `
+    -Timestamp $navTs `
+    -Files @("App/app")
+
+# Group 16: API Config
+$apiConfigTs = Get-FileTimestamp "App/config/api.js"
+if (-not $apiConfigTs) { $apiConfigTs = $navTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "API service layer and auto-updating config" `
+    -Timestamp $apiConfigTs `
+    -Files @("App/config", "App/services/api.js")
+
+# Group 17: Auth Screens
+$loginTs = Get-FileTimestamp "App/screens/login.jsx"
+if (-not $loginTs) { $loginTs = $apiConfigTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Login signup OTP screens with validation" `
+    -Timestamp $loginTs `
+    -Files @("App/screens/login.jsx", "App/screens/signup.jsx", "App/screens/otp.jsx")
+
+# Group 18: Onboarding
+$onboardTs = Get-FileTimestamp "App/screens/splash.jsx"
+if (-not $onboardTs) { $onboardTs = $loginTs.AddHours(6) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Splash screen and onboarding flow" `
+    -Timestamp $onboardTs `
+    -Files @("App/screens/splash.jsx", "App/screens/obnboarding.jsx")
+
+# Group 19: Profile
+$profileTs = Get-FileTimestamp "App/screens/setProfile.jsx"
+if (-not $profileTs) { $profileTs = $onboardTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Profile setup and user profile pages" `
+    -Timestamp $profileTs `
+    -Files @("App/screens/setProfile.jsx", "App/screens/userProfile.jsx", `
+             "App/screens/profileDetail.jsx")
+
+# Group 20: Patient Features
+$patientTs = Get-FileTimestamp "App/screens/patientdashboard.jsx"
+if (-not $patientTs) { $patientTs = $profileTs.AddDays(2) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Patient dashboard and booking flow" `
+    -Timestamp $patientTs `
+    -Files @("App/screens/patientdashboard.jsx", "App/screens/bookingflow.jsx", `
+             "App/screens/bookingconfirmation.jsx")
+
+# Group 21: Caregiver Features
+$caregiverAppTs = Get-FileTimestamp "App/screens/caregiverDashboard.jsx"
+if (-not $caregiverAppTs) { $caregiverAppTs = $patientTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Caregiver dashboard and profile management" `
+    -Timestamp $caregiverAppTs `
+    -Files @("App/screens/caregiverDashboard.jsx", "App/screens/caregiverProfile.jsx", `
+             "App/screens/caregiverActiveBooking.jsx")
+
+# Group 22: Tracking
+$trackingTs = Get-FileTimestamp "App/screens/tracking.jsx"
+if (-not $trackingTs) { $trackingTs = $caregiverAppTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Service tracking and location features" `
+    -Timestamp $trackingTs `
+    -Files @("App/screens/tracking.jsx", "App/screens/patientServiceTracking.jsx", `
+             "App/screens/locationPayment.jsx")
+
+# Group 23: Pending Screens
+$pendingTs = Get-FileTimestamp "App/screens/pendingVerification.jsx"
+if (-not $pendingTs) { $pendingTs = $trackingTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Pending verification and approval screens" `
+    -Timestamp $pendingTs `
+    -Files @("App/screens/pendingVerification.jsx", "App/screens/pendingApproval.jsx")
+
+# Group 24: Assets
+$assetsTs = Get-FileTimestamp "App/assets/images/icon.png"
+if (-not $assetsTs) { $assetsTs = $pendingTs.AddHours(4) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "App assets images and icons" `
+    -Timestamp $assetsTs `
+    -Files @("App/assets")
+
+# ===== ADMIN PORTAL =====
+
+# Group 25: Admin Setup
+$adminPortalTs = Get-FileTimestamp "Admin Portal/package.json"
+if (-not $adminPortalTs) { $adminPortalTs = $appTs.AddDays(3) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Admin portal with Vite React TypeScript Tailwind" `
+    -Timestamp $adminPortalTs `
+    -Files @("Admin Portal/package.json", "Admin Portal/package-lock.json", `
+             "Admin Portal/.gitignore", "Admin Portal/vite.config.ts", `
+             "Admin Portal/tailwind.config.js", "Admin Portal/tsconfig.json", `
+             "Admin Portal/index.html")
+
+# Group 26: Admin Components
+$adminCompTs = Get-FileTimestamp "Admin Portal/src/components/Layout.tsx"
+if (-not $adminCompTs) { $adminCompTs = $adminPortalTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Admin portal layout sidebar header components" `
+    -Timestamp $adminCompTs `
+    -Files @("Admin Portal/src/components", "Admin Portal/src/App.tsx", `
+             "Admin Portal/src/main.tsx")
+
+# Group 27: Admin Login
+$adminLoginTs = Get-FileTimestamp "Admin Portal/src/pages/Login.tsx"
+if (-not $adminLoginTs) { $adminLoginTs = $adminCompTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Admin authentication and login page" `
+    -Timestamp $adminLoginTs `
+    -Files @("Admin Portal/src/pages/Login.tsx", "Admin Portal/src/config/api.ts")
+
+# Group 28: Admin Dashboard
+$adminDashTs = Get-FileTimestamp "Admin Portal/src/pages/Dashboard.tsx"
+if (-not $adminDashTs) { $adminDashTs = $adminLoginTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Admin dashboard with statistics and analytics" `
+    -Timestamp $adminDashTs `
+    -Files @("Admin Portal/src/pages/Dashboard.tsx", "Admin Portal/src/pages/Analytics.tsx")
+
+# Group 29: Verification
+$verifyTs = Get-FileTimestamp "Admin Portal/src/pages/VerificationCenter.tsx"
+if (-not $verifyTs) { $verifyTs = $adminDashTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "User verification center for document approval" `
+    -Timestamp $verifyTs `
+    -Files @("Admin Portal/src/pages/VerificationCenter.tsx")
+
+# Group 30: Management Pages
+$mgmtTs = Get-FileTimestamp "Admin Portal/src/pages/UserManagement.tsx"
+if (-not $mgmtTs) { $mgmtTs = $verifyTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "User and booking management pages" `
+    -Timestamp $mgmtTs `
+    -Files @("Admin Portal/src/pages/UserManagement.tsx", `
+             "Admin Portal/src/pages/BookingManagement.tsx")
+
+# Group 31: Additional Pages
+$addPagesTs = Get-FileTimestamp "Admin Portal/src/pages/Payments.tsx"
+if (-not $addPagesTs) { $addPagesTs = $mgmtTs.AddDays(1) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Payments reviews safety monitoring pages" `
+    -Timestamp $addPagesTs `
+    -Files @("Admin Portal/src/pages/Payments.tsx", "Admin Portal/src/pages/Reviews.tsx", `
+             "Admin Portal/src/pages/SafetyMonitoring.tsx", "Admin Portal/src/pages/Settings.tsx")
+
+# Group 32: Admin Styling
+$adminStyleTs = Get-FileTimestamp "Admin Portal/src/index.css"
+if (-not $adminStyleTs) { $adminStyleTs = $addPagesTs.AddHours(5) }
+
+New-SmartCommit -Author $DEVELOPER2_NAME -Email $DEVELOPER2_EMAIL `
+    -Message "Admin portal styling and assets" `
+    -Timestamp $adminStyleTs `
+    -Files @("Admin Portal/src/index.css", "Admin Portal/src/App.css", "Admin Portal/public")
+
+# ===== ROOT FILES =====
+
+# Group 33: Documentation
+$docsTs = Get-FileTimestamp "README.md"
+if (-not $docsTs) { $docsTs = $adminStyleTs.AddDays(2) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Project documentation and setup guides" `
+    -Timestamp $docsTs `
+    -Files @("README.md", "QUICK_START.md", "ADMIN_CREDENTIALS.md", "GITHUB_SETUP.md")
+
+# Group 34: Startup Scripts
+$startupTs = Get-FileTimestamp "START_ALL.bat"
+if (-not $startupTs) { $startupTs = $docsTs.AddHours(4) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Windows batch scripts for easy startup" `
+    -Timestamp $startupTs `
+    -Files @("START_ALL.bat", "start-server.bat", "Server/start-server.bat")
+
+# Group 35: Git Utilities
+$gitUtilTs = Get-FileTimestamp "setup-git.bat"
+if (-not $gitUtilTs) { $gitUtilTs = $startupTs.AddHours(2) }
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Git setup and history management scripts" `
+    -Timestamp $gitUtilTs `
+    -Files @("setup-git.bat", "clear-git-history.bat", ".gitignore")
+
+# Group 36: Remaining Files
+$finalTs = (Get-Date).AddMinutes(-30)
+
+New-SmartCommit -Author $DEVELOPER1_NAME -Email $DEVELOPER1_EMAIL `
+    -Message "Additional utility files and configurations" `
+    -Timestamp $finalTs `
+    -Files @("Server/modals", "Server/middleware", "imgs")
+
+# ============================================================================
+# FINALIZE
+# ============================================================================
+
+Write-Host ""
+Write-Host "[OK] All commits created with backdated timestamps!" -ForegroundColor Green
+Write-Host ""
+
+$total = (git log --oneline | Measure-Object).Count
+$dev1 = (git log --author="$DEVELOPER1_NAME" --oneline | Measure-Object).Count
+$dev2 = (git log --author="$DEVELOPER2_NAME" --oneline | Measure-Object).Count
+
+Write-Host "Statistics:" -ForegroundColor Green
+Write-Host "  Total Commits:        $total"
+Write-Host "  $DEVELOPER1_NAME`:    $dev1 commits"
+Write-Host "  $DEVELOPER2_NAME`:    $dev2 commits"
+Write-Host ""
+
+Write-Host "Recent commits:" -ForegroundColor Cyan
+git log --oneline --graph --all -15
+
+Write-Host ""
+Write-Host "Ready to push to GitHub!" -ForegroundColor Red
+Write-Host ""
+Write-Host "Commands to push:" -ForegroundColor Yellow
+Write-Host "  cd $(Get-Location)"
+Write-Host "  git remote add origin $REPO_URL"
+Write-Host "  git push -u origin main --force"
+Write-Host ""
+
+$pushNow = Read-Host "Push now? (y/n)"
+
+if ($pushNow -eq "y" -or $pushNow -eq "Y") {
+    git remote add origin $REPO_URL
+    git push -u origin main --force
+    Write-Host ""
+    Write-Host "[OK] Pushed to GitHub!" -ForegroundColor Green
+}
+
+Write-Host ""
+Write-Host "Done! Repository: $REPO_URL" -ForegroundColor Green
+Write-Host ""

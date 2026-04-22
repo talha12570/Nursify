@@ -93,3 +93,9 @@ Server/.env
 
 # Keep credential templates (optional - remove these lines if you want to keep credentials private)
 # ADMIN_CREDENTIALS.md
+
+# Mastercard certificates (never commit private keys)
+Server/certs/
+*.p12
+*.pem
+*.key

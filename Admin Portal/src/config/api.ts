@@ -13,7 +13,7 @@
  */
 
 // ⚠️ This IP is auto-updated when server starts, but you can manually change it if needed
-const SERVER_IP = '192.168.100.40';
+const SERVER_IP = '192.168.137.95';
 const SERVER_PORT = '5000';
 
 // Automatically construct the API URL

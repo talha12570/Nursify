@@ -1,0 +1,74 @@
+@startuml
+
+skinparam ArrowThickness 2
+left to right direction
+
+package "Client Layer" {
+  rectangle "Mobile App" as MobileApp
+  rectangle "Admin Portal" as AdminPortal
+}
+
+package "Backend Layer" {
+  package "Public APIs" {
+    rectangle "Auth API" as AuthAPI
+    rectangle "OTP API" as OtpAPI
+  }
+  
+  rectangle "Auth Middleware" as AuthMW
+  
+  package "Protected APIs" {
+    rectangle "Patient API" as PatientAPI
+    rectangle "Caregiver API" as CaregiverAPI
+    rectangle "Admin API" as AdminAPI
+    rectangle "Review API" as ReviewAPI
+  }
+  
+  rectangle "File Upload" as FileUpload
+}
+
+package "Database Layer" {
+  rectangle "Users" as Users
+  rectangle "Bookings" as Bookings
+  rectangle "Services" as Services
+  rectangle "Reviews" as ReviewsDB
+  rectangle "MongoDB" as MongoDB
+}
+
+package "External Services" {
+  rectangle "Cloudinary" as Cloudinary
+  rectangle "SMTP" as SMTP
+}
+
+MobileApp --> AuthAPI
+MobileApp --> OtpAPI
+MobileApp --> AuthMW
+AdminPortal --> AuthAPI
+AdminPortal --> AuthMW
+
+AuthMW --> PatientAPI
+AuthMW --> CaregiverAPI
+AuthMW --> AdminAPI
+AuthMW --> ReviewAPI
+
+AuthAPI --> FileUpload
+FileUpload --> Cloudinary
+
+AuthAPI --> Users
+OtpAPI --> Users
+PatientAPI --> Users
+PatientAPI --> Bookings
+PatientAPI --> Services
+CaregiverAPI --> Users
+CaregiverAPI --> Bookings
+AdminAPI --> Users
+ReviewAPI --> ReviewsDB
+
+Users --> MongoDB
+Bookings --> MongoDB
+Services --> MongoDB
+ReviewsDB --> MongoDB
+
+AuthAPI --> SMTP
+OtpAPI --> SMTP
+
+@enduml

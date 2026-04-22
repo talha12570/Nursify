@@ -1,0 +1,82 @@
+@startuml
+
+package "Client Layer" {
+  [Mobile App]
+  [Admin Portal]
+}
+
+package "Backend Layer" {
+  
+  package "Public APIs" {
+    [Auth API]
+    [OTP API]  
+    [Health API]
+  }
+  
+  [Auth Middleware]
+  [File Upload]
+  
+  package "Protected APIs" {
+    [Patient API]
+    [Caregiver API]
+    [Review API]
+    [Admin API]
+  }
+}
+
+cloud "External Services" {
+  [SMTP]
+  [Cloudinary]
+}
+
+database "MongoDB" {
+  frame "Collections" {
+    [Users]
+    [Bookings]
+    [Services]
+    [Reviews]
+    [Caregivers]
+    [Email Tokens]
+  }
+}
+
+[Mobile App] --> [Auth API]
+[Mobile App] --> [OTP API]
+[Mobile App] --> [Health API]
+
+[Admin Portal] --> [Auth API]
+
+[Mobile App] --> [Auth Middleware]
+[Admin Portal] --> [Auth Middleware]
+
+[Auth Middleware] --> [Patient API]
+[Auth Middleware] --> [Caregiver API]
+[Auth Middleware] --> [Review API]
+[Auth Middleware] --> [Admin API]
+
+[Auth API] --> [File Upload]
+[File Upload] --> [Cloudinary]
+
+[Auth API] --> [SMTP]
+[OTP API] --> [SMTP]
+
+[Auth API] --> [Users]
+[Auth API] --> [Email Tokens]
+
+[OTP API] --> [Users]
+
+[Patient API] --> [Users]
+[Patient API] --> [Bookings]
+[Patient API] --> [Services]
+
+[Caregiver API] --> [Users]
+[Caregiver API] --> [Caregivers]
+[Caregiver API] --> [Bookings]
+
+[Review API] --> [Reviews]
+
+[Admin API] --> [Users]
+[Admin API] --> [Bookings]
+[Admin API] --> [Services]
+
+@enduml

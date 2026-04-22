@@ -1,0 +1,220 @@
+NURSIFY - TECHNOLOGIES AND DEPLOYMENT HELP REFERENCE
+Date: 2026-04-07
+
+=================================================================
+1) PROJECT OVERVIEW
+=================================================================
+Nursify has 3 main parts:
+- Mobile App: React Native + Expo (folder: App)
+- Admin Portal: React + TypeScript web app (folder: Admin Portal)
+- Backend API: Node.js + Express server (folder: Server)
+
+
+=================================================================
+2) FRONTEND TECHNOLOGIES
+=================================================================
+
+A) Mobile App (App)
+- Framework: React Native 0.81.5
+- Platform/runtime: Expo SDK 54
+- Routing: expo-router
+- Language: JavaScript/JSX (with TypeScript config present)
+- State/storage: @react-native-async-storage/async-storage
+- Navigation: @react-navigation/native, bottom-tabs
+- UI/Styling:
+  - NativeWind
+  - TailwindCSS (mobile)
+  - expo-linear-gradient
+  - expo-vector-icons
+- Maps/Location:
+  - react-native-maps
+  - expo-location
+  - Google Maps APIs (Distance Matrix + Geocoding)
+- Media/File features:
+  - expo-image-picker
+  - expo-image-manipulator
+  - expo-file-system
+  - expo-document-picker
+- Networking: axios
+
+B) Admin Portal (Admin Portal)
+- Framework: React 19
+- Build tool: Vite 7
+- Language: TypeScript
+- Routing: react-router-dom
+- Charts: recharts
+- Icons: lucide-react
+- Styling:
+  - TailwindCSS 4
+  - PostCSS + Autoprefixer
+- Networking: axios
+
+
+=================================================================
+3) BACKEND TECHNOLOGIES
+=================================================================
+
+Backend (Server)
+- Runtime: Node.js
+- Framework: Express 4
+- Language: JavaScript
+- Authentication/Security:
+  - jsonwebtoken (JWT)
+  - bcryptjs (password hashing)
+- Validation: zod
+- Database:
+  - MongoDB
+  - Mongoose ODM
+- File upload/media:
+  - multer
+  - cloudinary
+  - multer-storage-cloudinary
+- Queue/Background jobs:
+  - bull
+  - ioredis (Redis)
+- Email:
+  - nodemailer
+- Performance/Middleware:
+  - compression
+  - cors
+  - dotenv
+- External/API tools:
+  - axios
+  - form-data
+  - mastercard-oauth1-signer
+  - node-forge
+- Caching:
+  - node-cache
+- Development server:
+  - nodemon
+
+
+=================================================================
+4) DATA, CLOUD, AND THIRD-PARTY SERVICES
+=================================================================
+- Primary database: MongoDB Atlas (recommended/used in deployment docs)
+- Media storage/CDN: Cloudinary
+- Tunnel for testing: ngrok (development/global testing)
+- Queue broker (if jobs enabled): Redis
+- Email provider (SMTP): used through nodemailer
+- Maps provider: Google Maps API
+- Optional payment/integration indication: Mastercard API signer present
+
+
+=================================================================
+5) DEPLOYMENT STACK
+=================================================================
+
+Recommended production pattern:
+- Backend hosting: Railway (recommended in project docs)
+- Alternatives: Render, Fly.io, DigitalOcean App Platform
+- DB hosting: MongoDB Atlas
+- Mobile distribution: Expo/EAS Build
+
+Current development/testing pattern:
+- Backend local on port 5000
+- ngrok exposes backend for external devices
+- Expo tunnel for mobile app connectivity
+
+
+=================================================================
+6) IMPORTANT ENVIRONMENT VARIABLES (BACKEND)
+=================================================================
+Set these in hosting platform (Railway/Render/etc):
+- NODE_ENV=production
+- MONGODB_URI
+- JWT_SECRET_KEY
+- CLOUDINARY_CLOUD_NAME
+- CLOUDINARY_API_KEY
+- CLOUDINARY_API_SECRET
+- SMTP_HOST
+- SMTP_PORT
+- SMTP_USER
+- SMTP_PASS
+
+Optional/additional vars may exist in your codebase for specific features.
+
+
+=================================================================
+7) IMPORTANT ENVIRONMENT VARIABLES (MOBILE APP)
+=================================================================
+Set in App/.env (and/or Expo extra config):
+- EXPO_PUBLIC_BASE_URL
+- EXPO_PUBLIC_API_URL
+- EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+
+
+=================================================================
+8) BUILD/START COMMANDS (COMMON)
+=================================================================
+
+Backend:
+- cd Server
+- npm install
+- npm start
+
+Admin Portal:
+- cd "Admin Portal"
+- npm install
+- npm run dev
+- npm run build
+
+Mobile App:
+- cd App
+- npm install
+- npm start
+- npm run start:tunnel
+- npx expo start --tunnel --clear
+
+
+=================================================================
+9) BACKEND HELP TEMPLATE (COPY/PASTE WHEN ASKING FOR SUPPORT)
+=================================================================
+Use this template when asking for help so others can debug quickly:
+
+Project: Nursify backend (Node.js + Express + MongoDB)
+Hosting target: Railway (or Render)
+Issue type: [deployment error / API error / auth / DB / uploads / email]
+
+Tech stack:
+- Node.js + Express
+- MongoDB + Mongoose
+- JWT + bcryptjs
+- Cloudinary + multer
+- Nodemailer (SMTP)
+- Bull + Redis (if queue path involved)
+
+Environment:
+- NODE_ENV=production
+- MONGODB_URI set: [yes/no]
+- JWT_SECRET_KEY set: [yes/no]
+- Cloudinary vars set: [yes/no]
+- SMTP vars set: [yes/no]
+
+Symptoms:
+- Error message:
+- Endpoint affected:
+- Expected behavior:
+- Actual behavior:
+
+Recent changes:
+- [what changed before issue started]
+
+Logs:
+- [paste backend console logs]
+
+
+=================================================================
+10) QUICK BACKEND TROUBLESHOOTING CHECKLIST
+=================================================================
+- Confirm server is running and bound to correct port in host.
+- Confirm all required env vars are set in deployment dashboard.
+- Confirm MongoDB Atlas network access and credentials are valid.
+- Confirm CORS is configured for app/admin origins.
+- Confirm JWT secret is same and not empty in production.
+- Confirm Cloudinary credentials and upload folder config.
+- Confirm SMTP host/port/user/pass and provider restrictions.
+- Confirm health endpoint works before testing other endpoints.
+
+
+End of file.
